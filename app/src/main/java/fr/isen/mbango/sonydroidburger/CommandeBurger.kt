@@ -10,11 +10,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
@@ -23,7 +21,6 @@ import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -35,14 +32,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import coil.compose.rememberImagePainter
-import com.google.firebase.crashlytics.buildtools.reloc.com.google.common.reflect.TypeToken
-import com.google.gson.Gson
+import com.google.i18n.phonenumbers.NumberParseException
 import com.google.i18n.phonenumbers.PhoneNumberUtil
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
-import okio.IOException
 
 
 @SuppressLint("UnrememberedMutableState")
@@ -163,55 +154,29 @@ fun PhoneNumberTextField(
     label: String,
     modifier: Modifier = Modifier
 ) {
-    val phoneNumberUtil = remember { PhoneNumberUtil.getInstance() }
     var selectedCountryCode by remember { mutableStateOf("FR") }
     var selectedCountryName by remember { mutableStateOf("France (+33)") }
 
-    var countries by remember { mutableStateOf(mutableListOf<Pair<String, String>>()) }
-
-    LaunchedEffect(Unit) {
-        val fetchedCountryCodes = withContext(Dispatchers.IO) {
-            try {
-                fetchCountryCodes()
-            } catch (e: IOException) {
-                emptyList() // En cas d'erreur, retourner une liste vide
-            }
-        }
-        countries = fetchedCountryCodes.toMutableList()
-    }
-
-    var dropdownDismissed by remember { mutableStateOf(false) }
+    val phoneNumberUtil = remember { PhoneNumberUtil.getInstance() }
+    val countries = remember { getCountryList() }
 
     Column {
+        // Dropdown Menu for selecting country code
         DropdownMenu(
-            expanded = true,
-            onDismissRequest = {
-                dropdownDismissed = true
-            }
+            expanded = false,
+            onDismissRequest = { /* Dropdown dismissed */ }
         ) {
             countries.forEach { (countryCode, countryName) ->
-                val flagPainter = rememberImagePainter(
-                    data = "https://www.countryflags.io/${countryCode.toLowerCase()}/flat/64.png",
-                    builder = {
-                        crossfade(true)
-                    }
-                )
                 DropdownMenuItem(onClick = {
                     selectedCountryCode = countryCode
                     selectedCountryName = countryName
                 }) {
-                    Row {
-                        Image(
-                            painter = flagPainter,
-                            contentDescription = null,
-                            modifier = Modifier.width(30.dp)
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text(countryName)
-                    }
+                    Text(countryName)
                 }
             }
         }
+
+        // Text field for entering phone number
         OutlinedTextField(
             value = phoneNumberState.value,
             onValueChange = { phoneNumber ->
@@ -219,11 +184,12 @@ fun PhoneNumberTextField(
                 if (phoneNumber.isBlank()) return@OutlinedTextField
                 val parsedNumber = try {
                     phoneNumberUtil.parseAndKeepRawInput(phoneNumber, selectedCountryCode)
-                } catch (e: Exception) {
+                } catch (e: NumberParseException) {
                     null
                 }
                 if (parsedNumber != null && !phoneNumberUtil.isValidNumber(parsedNumber)) {
-                  //  phoneNumberState.value = phoneNumberState.value.dropLast(8)
+                    // Handle invalid phone number
+                    // Example: phoneNumberState.value = phoneNumberState.value.dropLast(1)
                 }
             },
             label = { Text(label) },
@@ -233,24 +199,14 @@ fun PhoneNumberTextField(
     }
 }
 
-suspend fun fetchCountryCodes(): List<Pair<String, String>> {
-    val client = OkHttpClient()
-    val request = okhttp3.Request.Builder()
-        .url("https://restcountries.com/v3.1/all?fields=alpha3Code,name.common")
-        .build()
-    val response = client.newCall(request).execute()
-    val responseBody = response.body?.string()
-
-    // Vérifiez si la réponse est null
-    if (responseBody == null) {
-        // Si la réponse est null, retournez une liste vide ou lancez une exception
-        return emptyList()
-    }
-
-    val gson = Gson()
-    val type = object : TypeToken<List<Map<String, String>>>() {}.type
-    val countries: List<Map<String, String>> = gson.fromJson(responseBody, type)
-    return countries.map { it["alpha3Code"]!! to it["name"]!! }
+fun getCountryList(): List<Pair<String, String>> {
+    return listOf(
+        "FR" to "France (+33)",
+        "US" to "United States (+1)",
+        "GB" to "United Kingdom (+44)",
+        "DE" to "Germany (+49)"
+        // Add more countries as needed...
+    )
 }
 
 
