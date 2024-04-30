@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "282483104356",
+    "project_id": "sonydroidburger",
+    "storage_bucket": "sonydroidburger.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:282483104356:android:97fc346db98a9f0f075d71",
+        "android_client_info": {
+          "package_name": "fr.isen.mbango.sonydroidburger"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB_6-CP3c37ATOSY6_5XlazrkYUkePe9w0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
