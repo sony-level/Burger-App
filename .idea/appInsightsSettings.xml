@@ -8,10 +8,10 @@
             <InsightsFilterSettings>
               <option name="connection">
                 <ConnectionSetting>
-                  <option name="appId" value="PLACEHOLDER" />
-                  <option name="mobileSdkAppId" value="" />
-                  <option name="projectId" value="" />
-                  <option name="projectNumber" value="" />
+                  <option name="appId" value="fr.isen.mbango.sonydroidburger" />
+                  <option name="mobileSdkAppId" value="1:282483104356:android:97fc346db98a9f0f075d71" />
+                  <option name="projectId" value="sonydroidburger" />
+                  <option name="projectNumber" value="282483104356" />
                 </ConnectionSetting>
               </option>
               <option name="signal" value="SIGNAL_UNSPECIFIED" />
