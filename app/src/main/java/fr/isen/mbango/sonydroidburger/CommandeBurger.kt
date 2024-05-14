@@ -1,6 +1,11 @@
 package fr.isen.mbango.sonydroidburger
 
-import android.annotation.SuppressLint
+import android.app.TimePickerDialog
+import android.os.Build
+import android.os.Handler
+import android.os.Looper
+import android.widget.Toast
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -21,6 +26,7 @@ import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -29,24 +35,34 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.google.i18n.phonenumbers.NumberParseException
 import com.google.i18n.phonenumbers.PhoneNumberUtil
+import okhttp3.Call
+import okhttp3.Callback
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONObject
+import java.io.IOException
+import java.time.LocalTime
 
 
-@SuppressLint("UnrememberedMutableState")
+@RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun CommandeBurger() {
-
-
-    val nomState = remember { mutableStateOf("") }
-    val prenomState = remember { mutableStateOf("") }
-    val adresseState = remember { mutableStateOf("") }
-    val phoneNumberState = remember { mutableStateOf("") }
-    val selectedBurgerState = remember { mutableStateOf("") }
-    val heureLivraisonState = remember { mutableStateOf("") }
+    var showTimePickerDialog by remember { mutableStateOf(false) }
+    var nomState by remember { mutableStateOf("") }
+    var prenomState by remember { mutableStateOf("") }
+    var adresseState by remember { mutableStateOf("") }
+    var phoneNumberState = remember { mutableStateOf("") }
+    var selectedBurgerState by remember { mutableStateOf("") }
+    var heureLivraisonState by remember { mutableStateOf("") }
+    var selectedTime by remember { mutableStateOf(LocalTime.now()) }
 
     Column(
         modifier = Modifier
@@ -60,93 +76,117 @@ fun CommandeBurger() {
             contentDescription = "Logo DroidBurger",
             modifier = Modifier.size(120.dp)
         )
-
         Text(
             text = "Commande de Burger",
             style = MaterialTheme.typography.headlineMedium,
             color = Color.Black,
             modifier = Modifier.padding(vertical = 8.dp)
         )
-
-        // Champ de saisie pour le nom
-        OutlinedTextField(
-            value = nomState.value,
-            onValueChange = { nomState.value = it },
-            label = { Text("Nom") },
-            modifier = Modifier
-                .padding(vertical = 4.dp)
-                .fillMaxWidth()
-        )
-
-        // Champ de saisie pour le prénom
-        OutlinedTextField(
-            value = prenomState.value,
-            onValueChange = { prenomState.value = it },
-            label = { Text("Prénom") },
-            modifier = Modifier
-                .padding(vertical = 4.dp)
-                .fillMaxWidth()
-        )
-
-        // Champ de saisie pour l'adresse
-        OutlinedTextField(
-            value = adresseState.value,
-            onValueChange = { adresseState.value = it },
-            label = { Text("Adresse") },
-            modifier = Modifier
-                .padding(vertical = 4.dp)
-                .fillMaxWidth()
-        )
-
+        NomTextField(value = nomState, onValueChange = { nomState = it })
+        PrenomTextField(value = prenomState, onValueChange = { prenomState = it })
+        AdresseTextField(value = adresseState, onValueChange = { adresseState = it })
         PhoneNumberTextField(
             phoneNumberState = phoneNumberState,
             label = "Numéro de téléphone",
-            modifier = Modifier
-                .padding(vertical = 4.dp)
-                .fillMaxWidth()
+            modifier = Modifier.fillMaxWidth()
         )
-
-        BurgerDropdown(
-            selectedBurgerState = selectedBurgerState,
-            modifier = Modifier
-                .padding(vertical = 4.dp)
-                .fillMaxWidth()
-        )
-
-        // Champ de saisie pour l'heure de livraison
-        OutlinedTextField(
-            value = heureLivraisonState.value,
-            onValueChange = { heureLivraisonState.value = it },
-            label = { Text("Heure de livraison (HH:MM)") },
-            modifier = Modifier
-                .padding(vertical = 4.dp)
-                .fillMaxWidth()
-        )
-
-        Button(
-            onClick = {   if (validerCommande(
-                    nomState.value,
-                    prenomState.value,
-                    adresseState.value,
-                    phoneNumberState.value,
-                    selectedBurgerState.value,
-                    heureLivraisonState.value
-                )
-            ) {
-                println("Commande validée")
+        BurgerDropdown(selectedBurgerState = selectedBurgerState, onSelectedBurgerChange = { selectedBurgerState = it })
+        Button(onClick = { showTimePickerDialog = true }, modifier = Modifier.padding(vertical = 4.dp).fillMaxWidth()) {
+            Text("Heure de livraison")
+        }
+        if (showTimePickerDialog) {
+            ShowTimePicker(initialTime = selectedTime, onTimeSelected = { time ->
+                selectedTime = time
+                heureLivraisonState = time.toString() // Mise à jour du champ de saisie
+                showTimePickerDialog = false
+            })
+        }
+        Button(onClick = {
+            if (validerChamps(nomState, prenomState, adresseState, phoneNumberState, selectedBurgerState, heureLivraisonState)) {
+                val commandeJson = creerJsonCommande(nomState, prenomState, adresseState, phoneNumberState, selectedBurgerState, heureLivraisonState)
+                EnvoyerCommandeAuServeur(commandeJson, idUser =  356 ) //l'ID utilisateur de level
             } else {
-                // Sinon, affichez un message à l'utilisateur ou prenez une autre action appropriée
-                println("Erreur dans la commande")
-            } },
-            modifier = Modifier
-                .padding(vertical = 8.dp)
-                .fillMaxWidth()
-        ) {
+                val context = LocalContext.current
+                Toast.makeText(context, "Tous les champs doivent être remplis", Toast.LENGTH_SHORT).show()
+            }
+        }, modifier = Modifier.padding(vertical = 8.dp).fillMaxWidth()) {
             Text("Valider la commande")
         }
     }
 }
 
+
+@Composable
+fun NomTextField(value: String, onValueChange: (String) -> Unit) {
+    OutlinedTextField(value = value, onValueChange = onValueChange, label = { Text("Nom") }, modifier = Modifier.padding(vertical = 4.dp).fillMaxWidth())
+}
+
+@Composable
+fun PrenomTextField(value: String, onValueChange: (String) -> Unit) {
+    OutlinedTextField(value = value, onValueChange = onValueChange, label = { Text("Prénom") }, modifier = Modifier.padding(vertical = 4.dp).fillMaxWidth())
+}
+
+@Composable
+fun AdresseTextField(value: String, onValueChange: (String) -> Unit) {
+    OutlinedTextField(value = value, onValueChange = onValueChange, label = { Text("Adresse") }, modifier = Modifier.padding(vertical = 4.dp).fillMaxWidth())
+}
+
+
+@Composable
+fun BurgerDropdown(
+    selectedBurgerState: String,
+    onSelectedBurgerChange: (String) -> Unit
+) {
+    val burgers = stringArrayResource(R.array.burger_list)
+
+    var expanded by remember { mutableStateOf(false) }
+
+    Box(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = "Burger sélectionné : $selectedBurgerState",
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = { expanded = true })
+                .padding(16.dp)
+        )
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            burgers.forEach { burger ->
+                DropdownMenuItem(onClick = {
+                    onSelectedBurgerChange(burger)
+                    expanded = false
+                }) {
+                    Text(burger)
+                }
+            }
+        }
+    }
+}
+
+@RequiresApi(Build.VERSION_CODES.O)
+@Composable
+fun ShowTimePicker(
+    initialTime: LocalTime,
+    onTimeSelected: (LocalTime) -> Unit
+) {
+    val context = LocalContext.current
+    Button(onClick = {
+        TimePickerDialog(
+            context,
+            { _, hourOfDay, minute ->
+                onTimeSelected(LocalTime.of(hourOfDay, minute))
+            },
+            initialTime.hour,
+            initialTime.minute,
+            true
+        ).show()
+    }) {
+        Text("Ouvrir le sélecteur d'heure")
+    }
+}
 
 @Composable
 fun PhoneNumberTextField(
@@ -161,7 +201,6 @@ fun PhoneNumberTextField(
     val countries = remember { getCountryList() }
 
     Column {
-        // Dropdown Menu for selecting country code
         DropdownMenu(
             expanded = false,
             onDismissRequest = { /* Dropdown dismissed */ }
@@ -175,8 +214,6 @@ fun PhoneNumberTextField(
                 }
             }
         }
-
-        // Text field for entering phone number
         OutlinedTextField(
             value = phoneNumberState.value,
             onValueChange = { phoneNumber ->
@@ -188,14 +225,26 @@ fun PhoneNumberTextField(
                     null
                 }
                 if (parsedNumber != null && !phoneNumberUtil.isValidNumber(parsedNumber)) {
-                    // Handle invalid phone number
-                    // Example: phoneNumberState.value = phoneNumberState.value.dropLast(1)
+                     phoneNumberState.value = phoneNumberState.value.dropLast(1)
                 }
             },
             label = { Text(label) },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             modifier = modifier
         )
+
+        // Example phone number text in the background
+        Box(
+            modifier = Modifier.fillMaxWidth(),
+            contentAlignment = Alignment.CenterEnd
+        ) {
+            Text(
+                text = "Ex: +33 6 12 34 56 78",
+                color = Color.Gray,
+                style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.padding(end = 16.dp)
+            )
+        }
     }
 }
 
@@ -208,7 +257,6 @@ fun getCountryList(): List<Pair<String, String>> {
         // Add more countries as needed...
     )
 }
-
 
 @Composable
 fun DropdownMenuItem(
@@ -232,76 +280,63 @@ fun DropdownMenuItem(
         Row { content() }
     }
 }
-
-@Composable
-fun BurgerDropdown(
-    selectedBurgerState: MutableState<String>,
-    modifier: Modifier = Modifier
-) {
-    val burgers = listOf(
-        "Burger du chef",
-        "Cheese Burger",
-        "Burger Montagnard",
-        "Burger Italien",
-        "Burger Végétarien"
-    )
-
-    var expanded by remember { mutableStateOf(false) }
-
-    Box(modifier = modifier.fillMaxWidth()) {
-        Text(
-            text = "Burger sélectionné : ${selectedBurgerState.value}",
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(onClick = { expanded = true })
-                .padding(16.dp)
-        )
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            burgers.forEach { burger ->
-                DropdownMenuItem(onClick = {
-                    //selectedBurgerState.value = burger
-                    expanded = false
-                }) {
-                    Text(burger)
-                }
-            }
-        }
-    }
+fun validerChamps(nom: String, prenom: String, adresse: String, phoneNumber: MutableState<String>, selectedBurger: String, heureLivraison: String): Boolean {
+    return nom.isNotBlank() && prenom.isNotBlank() && adresse.isNotBlank() && phoneNumber.value.isNotBlank()
+            && selectedBurger.isNotBlank() && heureLivraison.isNotBlank()
 }
 
-fun validerCommande(
+
+
+fun creerJsonCommande(
     nom: String,
     prenom: String,
     adresse: String,
-    numeroTelephone: String,
+    numeroTelephone: MutableState<String>,
     burgerSelectionne: String,
-    heureLivraison: String
-): Boolean {
-    // Vérifier si tous les champs sont remplis
-    if (nom.isBlank() || prenom.isBlank() || adresse.isBlank() || numeroTelephone.isBlank() || burgerSelectionne.isBlank() || heureLivraison.isBlank()) {
-        return false
+    heureLivraison: String): String {
+    val commande = mapOf(
+        "nom" to nom, "prenom" to prenom,
+        "adresse" to adresse,
+        "numeroTelephone" to numeroTelephone,
+        "burgerSelectionne" to burgerSelectionne,
+        "heureLivraison" to heureLivraison)
+    return JSONObject(commande).toString()
+}
+
+@Composable
+fun EnvoyerCommandeAuServeur(commandeJson: String, idUser: Int) {
+
+    var toastMessage by remember { mutableStateOf("") }
+
+    LaunchedEffect(key1 = toastMessage) {
+        val url = "http://test.api.catering.bluecodegames.com/user/order"
+        val jsonObject = JSONObject().apply {
+            put("id_shop", "1")
+            put("id_user", idUser)
+            put("msg", commandeJson)
+        }
+
+        val client = OkHttpClient()
+        val requestBody = jsonObject.toString().toRequestBody()
+        val request = Request.Builder().url(url).post(requestBody).build()
+
+        client.newCall(request).enqueue(object : Callback {
+            override fun onResponse(call: Call, response: okhttp3.Response) {
+                // Traitement de la réponse
+                val message = response.body?.string() ?: "No response"
+                toastMessage = message
+                }
+
+            override fun onFailure(call: Call, e: IOException) {
+                // Gestion de l'échec de la requête
+            toastMessage = "Request failed: ${e.message}"
+                }
+
+        })
     }
-
-    // Vérifier si le numéro de téléphone est un nombre
-    if (!numeroTelephone.matches(Regex("\\d+"))) {
-        return false
+    if (toastMessage.isNotBlank()) {
+        val context = LocalContext.current
+        Toast.makeText(context, toastMessage, Toast.LENGTH_LONG).show()
+        toastMessage = "" // Reset the message after showing the toast
     }
-
-    // Vérifier si le numéro de téléphone a une longueur valide
-    if (numeroTelephone.length != 10) {
-        return false
-    }
-
-    // Vérifier si l'heure de livraison est au bon format (HH:MM)
-    val heureRegex = Regex("^([01]?[0-9]|2[0-3]):[0-5][0-9]\$")
-    if (!heureLivraison.matches(heureRegex)) {
-        return false
-    }
-
-
-    return true
 }
