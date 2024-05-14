@@ -41,6 +41,9 @@ import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import com.google.i18n.phonenumbers.NumberParseException
 import com.google.i18n.phonenumbers.PhoneNumberUtil
 import kotlinx.coroutines.launch
@@ -67,7 +70,7 @@ fun CommandeBurger(navController: NavController) {
     val context = LocalContext.current
     var commandeEnvoyeeAvecSucces = remember { mutableStateOf(false) }
 
-        val coroutineScope = rememberCoroutineScope()
+    val coroutineScope = rememberCoroutineScope()
 
     Column(
         modifier = Modifier
@@ -95,8 +98,13 @@ fun CommandeBurger(navController: NavController) {
             label = "Numéro de téléphone",
             modifier = Modifier.fillMaxWidth()
         )
-        BurgerDropdown(selectedBurgerState = selectedBurgerState, onSelectedBurgerChange = { selectedBurgerState = it })
-        Button(onClick = { showTimePickerDialog = true }, modifier = Modifier.padding(vertical = 4.dp).fillMaxWidth()) {
+        BurgerDropdown(
+            selectedBurgerState = selectedBurgerState,
+            onSelectedBurgerChange = { selectedBurgerState = it })
+        Button(
+            onClick = { showTimePickerDialog = true },
+            modifier = Modifier.padding(vertical = 4.dp).fillMaxWidth()
+        ) {
             Text("Heure de livraison")
         }
         if (showTimePickerDialog) {
@@ -108,34 +116,64 @@ fun CommandeBurger(navController: NavController) {
         }
 
         Button(onClick = {
-            if (validerChamps(nomState, prenomState, adresseState, phoneNumberState, selectedBurgerState, heureLivraisonState)) {
-                val commandeJson = creerJsonCommande(nomState, prenomState, adresseState, phoneNumberState, selectedBurgerState, heureLivraisonState)
+            if (validerChamps(
+                    nomState,
+                    prenomState,
+                    adresseState,
+                    phoneNumberState,
+                    selectedBurgerState,
+                    heureLivraisonState
+                )
+            ) {
+                val commandeJson = creerJsonCommande(
+                    nomState,
+                    prenomState,
+                    adresseState,
+                    phoneNumberState,
+                    selectedBurgerState,
+                    heureLivraisonState
+                )
 
-                // Utiliser LaunchedEffect pour appeler la fonction suspendue dans un contexte composable
+
                 coroutineScope.launch {
                     val message = EnvoyerCommandeAuServeur(commandeJson, 356, context)
                     Toast.makeText(context, message, Toast.LENGTH_LONG).show()
-                    commandeEnvoyeeAvecSucces.value = message == "Commande envoyée avec succès"
+                    if (message == "Commande envoyée avec succès") {
+                        commandeEnvoyeeAvecSucces.value = true
+                        navController.navigate("confirmationRoute") // navigate to confirmation page
+                    }
                 }
             } else {
-                Toast.makeText(context, "Tous les champs doivent être remplis", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "Tous les champs doivent être remplis", Toast.LENGTH_SHORT)
+                    .show()
             }
         }, modifier = Modifier.padding(vertical = 8.dp).fillMaxWidth()) {
             Text("Valider la commande")
         }
 
-        // Afficher un message si la commande a été envoyée avec succès
+        // Affiche un message si la commande a été envoyée avec succès
         if (commandeEnvoyeeAvecSucces.value) {
             LaunchedEffect(Unit) {
                 Toast.makeText(context, "Commande envoyée avec succès", Toast.LENGTH_LONG).show()
-                commandeEnvoyeeAvecSucces.value = false // Réinitialiser la valeur après l'affichage du message
+                commandeEnvoyeeAvecSucces.value =
+                    false
             }
         }
 
     }
+
 }
 
 
+@RequiresApi(Build.VERSION_CODES.O)
+@Composable
+fun AppNavigator() {
+    val navController = rememberNavController()
+    NavHost(navController = navController, startDestination = "mainRoute") {
+        composable("mainRoute") { CommandeBurger(navController)}
+        composable("confirmationRoute") { ConfirmationPage() }
+    }
+}
 @Composable
 fun NomTextField(value: String, onValueChange: (String) -> Unit) {
     OutlinedTextField(value = value, onValueChange = onValueChange, label = { Text("Nom") }, modifier = Modifier.padding(vertical = 4.dp).fillMaxWidth())

@@ -27,8 +27,8 @@ fun Spinner(
                     .clickable { onItemSelected(index) },
                 style = TextStyle(
                     color = Color.Black,
-                    fontSize = 16.sp, // spécifiez la taille de la police
-                    textAlign = TextAlign.Left // spécifiez l'alignement du text
+                    fontSize = 16.sp,
+                    textAlign = TextAlign.Left
 
                 )
             )
