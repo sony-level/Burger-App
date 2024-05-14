@@ -63,6 +63,8 @@ dependencies {
     implementation(libs.firebase.crashlytics.buildtools)
     implementation(libs.volley)
     implementation(libs.androidx.tools.core)
+    implementation(libs.androidx.navigation.runtime.ktx)
+    implementation(libs.androidx.navigation.compose)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -76,6 +78,7 @@ dependencies {
     implementation ("com.google.code.gson:gson:2.10.1")
     implementation("com.google.firebase:firebase-analytics")
     implementation("androidx.compose.material:material:1.1.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.3.0")
 
 
 
