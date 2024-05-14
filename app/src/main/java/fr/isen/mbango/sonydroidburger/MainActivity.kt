@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.navigation.compose.rememberNavController
 import fr.isen.mbango.sonydroidburger.ui.theme.SonyDroidBurgerTheme
 
 class MainActivity : ComponentActivity() {
@@ -52,6 +53,7 @@ fun Greeting(name: String, modifier: Modifier = Modifier) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainContent() {
+    val navController = rememberNavController()
     Scaffold(
         topBar = {
             TopAppBar(
@@ -61,7 +63,7 @@ fun MainContent() {
         content = {
             Column {
                 Spacer(modifier = Modifier.height(20.dp)) // Ajoutez cette ligne
-                CommandeBurger( )
+                CommandeBurger(navController )
             }
         }
     )

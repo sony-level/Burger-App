@@ -30,6 +30,7 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,10 +40,10 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavController
 import com.google.i18n.phonenumbers.NumberParseException
 import com.google.i18n.phonenumbers.PhoneNumberUtil
-import okhttp3.Call
-import okhttp3.Callback
+import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -53,7 +54,8 @@ import java.time.LocalTime
 
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
-fun CommandeBurger() {
+
+fun CommandeBurger(navController: NavController) {
     var showTimePickerDialog by remember { mutableStateOf(false) }
     var nomState by remember { mutableStateOf("") }
     var prenomState by remember { mutableStateOf("") }
@@ -63,6 +65,9 @@ fun CommandeBurger() {
     var heureLivraisonState by remember { mutableStateOf("") }
     var selectedTime by remember { mutableStateOf(LocalTime.now()) }
     val context = LocalContext.current
+    var commandeEnvoyeeAvecSucces = remember { mutableStateOf(false) }
+
+        val coroutineScope = rememberCoroutineScope()
 
     Column(
         modifier = Modifier
@@ -101,16 +106,32 @@ fun CommandeBurger() {
                 showTimePickerDialog = false
             })
         }
+
         Button(onClick = {
             if (validerChamps(nomState, prenomState, adresseState, phoneNumberState, selectedBurgerState, heureLivraisonState)) {
                 val commandeJson = creerJsonCommande(nomState, prenomState, adresseState, phoneNumberState, selectedBurgerState, heureLivraisonState)
-                EnvoyerCommandeAuServeur(commandeJson, idUser =  356 , context) //l'ID utilisateur de level
+
+                // Utiliser LaunchedEffect pour appeler la fonction suspendue dans un contexte composable
+                coroutineScope.launch {
+                    val message = EnvoyerCommandeAuServeur(commandeJson, 356, context)
+                    Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                    commandeEnvoyeeAvecSucces.value = message == "Commande envoyée avec succès"
+                }
             } else {
                 Toast.makeText(context, "Tous les champs doivent être remplis", Toast.LENGTH_SHORT).show()
             }
         }, modifier = Modifier.padding(vertical = 8.dp).fillMaxWidth()) {
             Text("Valider la commande")
         }
+
+        // Afficher un message si la commande a été envoyée avec succès
+        if (commandeEnvoyeeAvecSucces.value) {
+            LaunchedEffect(Unit) {
+                Toast.makeText(context, "Commande envoyée avec succès", Toast.LENGTH_LONG).show()
+                commandeEnvoyeeAvecSucces.value = false // Réinitialiser la valeur après l'affichage du message
+            }
+        }
+
     }
 }
 
@@ -302,9 +323,44 @@ fun creerJsonCommande(
     return JSONObject(commande).toString()
 }
 
-@Composable
-fun EnvoyerCommandeAuServeur(commandeJson: String, idUser: Int, context: Context) {
 
+suspend fun EnvoyerCommandeAuServeur(
+    commandeJson: String,
+    idUser: Int,
+    context: Context
+): String {
+    val url = "http://test.api.catering.bluecodegames.com/user/order"
+    val jsonObject = JSONObject().apply {
+        put("id_shop", "1")
+        put("id_user", idUser)
+        put("msg", commandeJson)
+    }
+
+    val client = OkHttpClient()
+    val requestBody = jsonObject.toString().toRequestBody()
+    val request = Request.Builder().url(url).post(requestBody).build()
+
+    return try {
+        val response = client.newCall(request).execute()
+        val message = response.body?.string() ?: "No response"
+        if (response.isSuccessful) {
+            "Commande envoyée avec succès"
+        } else {
+            "La commande a échoué: $message"
+        }
+    } catch (e: IOException) {
+        "Request failed: ${e.message}"
+    }
+}
+
+
+/** @Composable
+ fun EnvoyeCommandeAuServeur(
+    commandeJson: String,
+    idUser: Int,
+    context: Context,
+    commandeEnvoyeeAvecSucces: MutableState<Boolean>
+) {
     var toastMessage by remember { mutableStateOf("") }
 
     LaunchedEffect(key1 = toastMessage) {
@@ -324,18 +380,21 @@ fun EnvoyerCommandeAuServeur(commandeJson: String, idUser: Int, context: Context
                 // Traitement de la réponse
                 val message = response.body?.string() ?: "No response"
                 toastMessage = message
+                if (response.isSuccessful) {
+                    commandeEnvoyeeAvecSucces.value = true
+                } else {
+                    commandeEnvoyeeAvecSucces.value = false
                 }
+            }
 
             override fun onFailure(call: Call, e: IOException) {
-                // Gestion de l'échec de la requête
-            toastMessage = "Request failed: ${e.message}"
-                }
-
+                toastMessage = "Request failed: ${e.message}"
+                commandeEnvoyeeAvecSucces.value = false
+            }
         })
     }
     if (toastMessage.isNotBlank()) {
-        val context = LocalContext.current
         Toast.makeText(context, toastMessage, Toast.LENGTH_LONG).show()
         toastMessage = ""
     }
-}
+} */
