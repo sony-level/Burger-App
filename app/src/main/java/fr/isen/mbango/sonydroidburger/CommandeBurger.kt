@@ -1,9 +1,8 @@
 package fr.isen.mbango.sonydroidburger
 
 import android.app.TimePickerDialog
+import android.content.Context
 import android.os.Build
-import android.os.Handler
-import android.os.Looper
 import android.widget.Toast
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.Image
@@ -63,6 +62,7 @@ fun CommandeBurger() {
     var selectedBurgerState by remember { mutableStateOf("") }
     var heureLivraisonState by remember { mutableStateOf("") }
     var selectedTime by remember { mutableStateOf(LocalTime.now()) }
+    val context = LocalContext.current
 
     Column(
         modifier = Modifier
@@ -104,9 +104,8 @@ fun CommandeBurger() {
         Button(onClick = {
             if (validerChamps(nomState, prenomState, adresseState, phoneNumberState, selectedBurgerState, heureLivraisonState)) {
                 val commandeJson = creerJsonCommande(nomState, prenomState, adresseState, phoneNumberState, selectedBurgerState, heureLivraisonState)
-                EnvoyerCommandeAuServeur(commandeJson, idUser =  356 ) //l'ID utilisateur de level
+                EnvoyerCommandeAuServeur(commandeJson, idUser =  356 , context) //l'ID utilisateur de level
             } else {
-                val context = LocalContext.current
                 Toast.makeText(context, "Tous les champs doivent être remplis", Toast.LENGTH_SHORT).show()
             }
         }, modifier = Modifier.padding(vertical = 8.dp).fillMaxWidth()) {
@@ -304,7 +303,7 @@ fun creerJsonCommande(
 }
 
 @Composable
-fun EnvoyerCommandeAuServeur(commandeJson: String, idUser: Int) {
+fun EnvoyerCommandeAuServeur(commandeJson: String, idUser: Int, context: Context) {
 
     var toastMessage by remember { mutableStateOf("") }
 
@@ -337,6 +336,6 @@ fun EnvoyerCommandeAuServeur(commandeJson: String, idUser: Int) {
     if (toastMessage.isNotBlank()) {
         val context = LocalContext.current
         Toast.makeText(context, toastMessage, Toast.LENGTH_LONG).show()
-        toastMessage = "" // Reset the message after showing the toast
+        toastMessage = ""
     }
 }
